@@ -246,7 +246,6 @@ $ gcc -Wall -g main.c -o test
 
 ```bash
 $ ulimit -c unlimited
-$ gdb <程序名> <coredump文件>
 ```
 
 | 选项 | 含义                                                         | 单位                  |
@@ -264,3 +263,51 @@ $ gdb <程序名> <coredump文件>
 | `-S` | 设置指定资源的**软限制**（实际生效的限制，用户可调整直至硬限制） |                       |
 
 ![截图](pic/004.png)
+
+运行错误程序
+
+![截图](pic/007.png)
+
+查看coredump生成的目录
+```bash
+$ cat /proc/sys/kernel/core_pattern
+```
+![截图](pic/005.png)
+
+发现系统配置了systemd-coredump，核心转储文件默认会被压缩并存储在 /var/lib/systemd/coredump/目录下
+
+![截图](pic/006.png)
+
+这里只能选择使用`coredumpctl`工具来查看被打包的zst文件
+
+```bash
+$ coredumpctl list
+$ coredumpctl info bug
+```
+
+![截图](pic/008.png)
+
+
+调试coredump，coredumpctl可以调用gdb来解析
+
+```bash
+$ coredumpctl debug bug
+```
+
+![截图](pic/009.png)
+
+导出原始core文件，直接使用gdb来解析
+
+```bash
+$ coredumpctl -o core.dump dump bug
+```
+
+> coredumpctl -o <coredump文件名> dump <被打包的程序名>
+
+使用gdb调试
+
+```bash
+$ gdb bug core.bug
+```
+
+![截图](pic/010.png)
