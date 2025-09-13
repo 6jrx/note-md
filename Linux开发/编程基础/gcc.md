@@ -45,6 +45,16 @@ $ gcc main.o hello.o -o test
 > 这里无需`-Wall`，因为`-Wall`是检查编译过程中的问题，这里只执行了链接操作
 
 
+* **`-MM`** : 该选项可以列出文件指定源程序目标文件`.o`的依赖文件
+
+在编写Makefile时非常好用
+
+```bash
+$ gcc -MM main.c
+```
+
+![截图](pic/012.png)
+
 ### ❗编译次序问题
 
 > 主要针对一些比较老的编辑器
@@ -478,6 +488,8 @@ $ objdump -s hello.o
 | **段内容查看**       | `-s` (`--full-contents`)  | 显示指定段的**完整原始内容**（十六进制 + ASCII）                                 | `objdump -s -j .data myapp`                      |
 |                      | `-j` `<section>`          | **仅操作指定的段**（可与 `-s`, `-d` 等选项配合）                                | `objdump -d -j .text myapp`                      |
 
+***
+
 * **`nm`** ： 该命令可以查看可执行文件里某个函数在哪个文件里定义等，用于分析程序的符号表
 
 ```bash
@@ -507,3 +519,54 @@ $ ldd test
 ```
 
 ![](pic/011.png)
+
+***
+
+* **`gprof`** : 常用于性能分析，帮助开发者了解程序在运行时各个函数消耗了多少时间，以及函数的调用关系
+
+a. **插桩（Instrumentation）**：
+    在编译和链接程序时，如果使用了 `-pg` 标志，GCC 编译器会在每个函数的入口处插入一小段额外的代码（称为“探针”）。
+    这段代码用于记录函数的调用次数和调用关系（即哪个父函数调用了当前函数）。
+    这部分数据构成了 “调用图”（Call Graph 分析的基础。
+
+b. **采样（Sampling）**：
+    在程序运行时，操作系统会定期向程序发送 `SIGPROF` 信号。
+    `gprof` 的信号处理程序会捕获这个信号，并记录当前程序计数器（PC）的值，即程序当时正在执行哪个函数。
+    通过统计这些采样点落在各个函数里的次数，`gprof` 可以估算出每个函数所占用的 CPU时间比例。采样频率通常为 100Hz（每秒钟100次）。
+
+程序运行结束后，这些数据会被写入一个名为 `gmon.out` 的文件。`gprof` 工具随后读取这个文件和你的可执行文件，生成一个易于阅读的分析报告。
+
+如何使用（基本步骤）
+
+1. **编译和链接**：使用 `-pg` 标志编译和链接你的程序。
+    ```bash
+    gcc -pg -o my_program my_program.c
+    ```
+2. **运行程序**：像平时一样执行程序。运行结束后，会生成一个 `gmon.out` 文件。
+    ```bash
+    ./my_program
+    ```
+3. **生成分析报告**：使用 `gprof` 命令分析 `gmon.out` 文件。
+    ```bash
+    gprof my_program gmon.out > analysis.txt
+    ```
+4. **查看报告**：打开 `analysis.txt` 文件查看性能分析结果。
+
+***
+
+* **`gcov`** : 可以用来查看覆盖率，一些不可能被调用到的代码会被检测出来
+
+```bash
+$ gcc -Wall fprofile-arcs -ftest-coverage test.c -o test.elf
+$ ./test.elf
+$ gcov test.elf
+```
+
+使用现代化工具查看测试报告
+
+```bash
+# 1. 捕获覆盖率数据并生成 info 文件
+$ lcov --capture --directory . --output-file coverage.info
+# 2. 生成HTML报告
+$ genhtml coverage.info --output-directory coverage_report
+```
