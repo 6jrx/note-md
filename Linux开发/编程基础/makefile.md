@@ -4,6 +4,8 @@
 
 ## 🐥执行目标
 
+***
+
 ```makefile
 # 定义一个名为hello的目标，它需要依赖hello.o和main.o
 # 目标: 依赖（多个依赖用空格分开）
@@ -20,9 +22,10 @@ main.o:
 
 执行`make`命令得到hello可执行程序
 
-***
 
 ## 🐟伪目标
+
+***
 
 * `.PHONY` ： 用来指定没有依赖的目标。不判断当前目录是否存在指定的依赖
 
@@ -39,7 +42,6 @@ clean:                   # 伪目标：make自带的语法标签，常用来清�
 
 使用`make clean`命令来运行这个伪目标
 
-***
 
 * `all` : 一般用来编译生成整个项目的完整程序
 
@@ -53,9 +55,10 @@ all: hello world
 
 使用`make all`来运行这个伪目标，会自动运行依赖的所有指令
 
-***
 
 ## 🕰自定义最终目标
+
+***
 
 ```makefile
 .DEFAULT_GOAL = obj
@@ -69,10 +72,10 @@ obj: obj.elf
 
 > 在通常情况下执行`make`命令会默认去make第一个目标，当不想默认执行第一个目标时，可以使用这个标签指定
 
-***
-
 
 ## 🌀依赖类型
+
+***
 
 * 普通依赖 : 前面写的目标的依赖都是普通依赖
 
@@ -88,9 +91,9 @@ main.o: main.c | hello.c
 	gcc -Wall -g -c main.c
 ```
 
-***
-
 ## 📻终端相关
+
+***
 
 * `.ONESHELL` : 如果使用了这个指令，那么每个目标里的方法都在一个shell进程中执行，可以共享环境变量
 
@@ -122,10 +125,9 @@ clean:
 	-rm main.o
 ```
 
-***
-
 ## 🥤使用变量替换
 
+***
 
 * `=` ： 常见的变量定义方式，进行字符串替换
 
@@ -264,9 +266,9 @@ obj2.c:
 	@echo $(var1)
 ```
 
-***
-
 ## 📦自动变量
+
+***
 
 * `$@`: 表示目标名
 
@@ -325,9 +327,10 @@ main.o: main.c
 | **`$(^D)`**        | 所有依赖文件的目录部分列表。                                                               |
 | **`$(^F)`**        | 所有依赖文件的文件名部分列表。                                                               |
 
-***
 
 ## 🧬多目标
+
+***
 
 ### 🪒独立多目标
 
@@ -387,9 +390,9 @@ clean:
 
 通常情况下不会使用到这个
 
-***
-
 ## 🔰多规则
+
+***
 
 1.当一个目标重复定义时，只会运行最后一个目标的方法，但是它们的依赖会被合并后全部执行
 
@@ -415,6 +418,8 @@ t4:
 
 ## 📝静态模式
 
+***
+
 通常用来组合独立多目标情况下的依赖更新检测问题
 
 ```makefile
@@ -436,7 +441,9 @@ clean:
 	-rm *.o
 ```
 
-## 指定依赖搜索路径
+## 🧚‍♀️指定依赖搜索路径
+
+***
 
 * `VPATH` : 指定依赖路径，可以是相对路径也可以是绝对路径。Makefile默认从所在目录找依赖文件
 
@@ -467,8 +474,353 @@ vpath test.h include
 vpath % src:include
 ```
 
+## 🧗‍♀️条件判断
 
 ***
+
+* `ifdef` : 判断变量是否被定义
+
+```makefile
+flag = Linux
+
+ifdef Win
+	flag = Windows
+else ifdef Mac
+	flag = MacOS
+endif
+```
+
+* `ifndef` : 判断变量未被定义
+
+```makefile
+flag = 0
+
+ifndef os
+	flag = 1
+else
+	flag = 0
+endif
+```
+
+* `ifeq` : 判断两个值是否相等
+
+```makefile
+var = abc
+var1 = adc
+
+# 注意空格和外括号
+ifeq ($(var), $(var1))
+	$(info var == var1)
+else
+	$(info var != var1)
+endif
+```
+或者可以用引号
+
+```makefile
+var = abc
+var1 = adc
+
+# 单引号或双引号都可以，也可以混用
+ifeq "$(var)" "$(var1)"
+	$(info var == var1)
+else
+	$(info var != var1)
+endif
+```
+
+* `ifneq` : 判断两个值不相等
+
+```makefile
+var = abc
+var1 = adc
+
+# 单引号或双引号都可以，也可以混用
+ifneq "$(var)" "$(var1)"
+	$(info var != var1)
+else
+	$(info var == var1)
+endif
+```
+
+## 🧑‍🎤字符串处理
+
+***
+
+* `subst` : 该关键字可以用来替换变量里的指定字符串
+
+```makefile
+files = main.c src/test.c src/hello.c
+
+# subst有3个参数(被替换的文本、替换为的文本、要替换的目标文本变量)
+# 之前那个用=替换的表达式只能替换结尾的内容，这个函数可以替换任意字符
+result = $(subst .c,.o,$(files))
+
+all:
+	$(info $(result))
+```
+
+> ⚠️注意：函数的参数之间不要有空格，其他函数都适用这个规则
+
+* `patsubst` : 支持模式匹配的字符串替换函数
+
+```makefile
+files = main.c src/test.c src/hello.c
+
+result = $(patsubst %.c,%.o,$(files))
+
+all:
+	$(info $(files))
+	$(info $(result))
+```
+
+> ⚠️注意：被替换的目标内容每项用空格分隔，没有空格分隔就会被当成一项来进行处理
+
+* `strip` : 去除多余空格，将头部和尾部多余的空格删掉
+
+```makefile
+files =   main.c     src/test.c  src/hello.c
+
+result = $(strip $(files))
+
+all:
+	$(info $(files))
+	$(info $(result))
+```
+
+* `findstring` : 查找字符串，返回查找的内容，没查到就返回空。内容不区分大小写
+
+```makefile
+files = main.c src/test.c src/hello.c
+
+result = $(findstring src,$(files))
+
+all:
+	$(info $(files))
+	$(info $(result))
+```
+
+* `filter` : 筛选出符合模式的内容并返回
+
+```makefile
+files = main.c src/test.c src/hello.c include/hello.h
+
+# 也可以同时筛选多个目标，用空格隔开
+result = $(filter %.h,$(files))
+
+all:
+	$(info $(files))
+	$(info $(result))
+```
+
+* `filter-out` : 与filter相反，筛选出不符合模式的内容
+
+```makefile
+files = main.c src/test.c src/hello.c include/hello.h
+
+result = $(filter-out %.h,$(files))
+
+all:
+	$(info $(files))
+	$(info $(result))
+```
+
+* `sort` : 按首字母排序，默认去除了重复内容
+
+```makefile
+files = main.c src/test.c src/hello.c include/hello.h
+
+result = $(sort $(files))
+
+all:
+	$(info $(files))
+	$(info $(result))
+```
+
+* `word` : 返回指定位置的目标，位置小于1就会报错，大于总长度就会返回空
+
+```makefile
+files = main.c src/test.c src/hello.c include/hello.h
+
+result = $(word 2,$(files))
+
+all:
+	$(info $(files))
+	$(info $(result))
+```
+
+* `wordlist` : 返回指定位置范围的多个目标，起始大于总长度就会返回空
+
+```makefile
+files = main.c src/test.c src/hello.c include/hello.h
+
+result = $(wordlist 1，3,$(files))
+
+all:
+	$(info $(files))
+	$(info $(result))
+```
+
+* `words` : 返回目标里的总项数
+
+```makefile
+files = main.c src/test.c src/hello.c include/hello.h
+
+result = $(words $(files))
+
+all:
+	$(info $(files))
+	$(info $(result))
+```
+
+* `firstword` : 返回目标里第一项
+
+```makefile
+files = main.c src/test.c src/hello.c include/hello.h
+
+result = $(firstword $(files))
+
+all:
+	$(info $(files))
+	$(info $(result))
+```
+
+* `lastword` : 返回目标里最后一项
+
+```makefile
+files = main.c src/test.c src/hello.c include/hello.h
+
+result = $(lastword $(files))
+
+all:
+	$(info $(files))
+	$(info $(result))
+```
+
+## 👨‍🏫文件处理函数
+
+***
+
+* `dir` : 返回目标里的每一项的目录
+
+```makefile
+files = main.c src/test.c src/hello.c include/hello.h
+
+result = $(dir $(files))
+
+all:
+	$(info $(files))
+	$(info $(result))
+```
+
+* `notdir` : 返回目标里每一项去除目录后的文件名
+
+```makefile
+files = main.c src/test.c src/hello.c include/hello.h
+
+result = $(notdir $(files))
+
+all:
+	$(info $(files))
+	$(info $(result))
+```
+
+* `suffix` : 返回目标里每一项的后缀名
+
+```makefile
+files = main.c src/test.c src/hello.c include/hello.h
+
+result = $(suffix $(files))
+
+all:
+	$(info $(files))
+	$(info $(result))
+```
+
+* `basename` : 返回目标里每一项去除后缀名之后的内容
+
+```makefile
+files = main.c src/test.c src/hello.c include/hello.h
+
+result = $(basename $(files))
+
+all:
+	$(info $(files))
+	$(info $(result))
+```
+
+* `addsuffix` : 给目标添加后缀名
+
+```makefile
+files = main.c src/test.c src/hello.c include/hello.h
+
+result = $(addsuffix .elf,$(files))
+
+all:
+	$(info $(files))
+	$(info $(result))
+```
+
+* `addprefix` : 给目标添加前缀
+
+```makefile
+files = main.c src/test.c src/hello.c include/hello.h
+
+result = $(addprefix ok_,$(files))
+
+all:
+	$(info $(files))
+	$(info $(result))
+```
+
+* `join` : 将两个目标里的每一项一对一连接，如果两个目标内容项数不对等，多出来的原样返回
+
+```makefile
+files = main.c src/test.c src/hello.c include/hello.h
+files1 = .a .b .o
+result = $(join $(files),$(files1))
+
+all:
+	$(info $(files))
+	$(info $(result))
+```
+
+* `wildcard` : 通配符匹配，返回使用通配符匹配到的文件
+
+```makefile
+result = $(wildcard *.c) $(wildcard *.h) $(wildcard include/*.h) $(wildcard src/*.c)
+
+all:
+	$(info $(result))
+```
+
+* `realpath` : 返回目标里每项文件的绝对路径，如果文件不存在就会被剔除
+
+```makefile
+files = main.c src/test.c src/hello.c include/hello.h
+
+result = $(realpath $(files))
+all:
+	$(info $(files))
+	$(info $(result))
+```
+
+* `abspath` : 与上面的realpath不同的是，就算文件不存在也会返回当前目录
+
+```makefile
+files = main.c src/test.c src/hello.c include/hello.h
+
+result = $(abspath $(files))
+all:
+	$(info $(files))
+	$(info $(result))
+```
+
+## 🤓条件函数
+
+***
+
+* `if` :
 
 #### 指定文件
 
