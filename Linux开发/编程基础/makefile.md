@@ -174,7 +174,7 @@ clean:
 
 * `+=` ： 追加赋值
 
-* `!=` : shell命令结果赋值，将shell命令执行的结果赋值给变量
+* `!=` : 将内容当作shell命令执行，将shell命令执行的结果赋值给变量，将每行结果用空格隔开
 
 > ⚠️注意：一些特殊文本在使用`echo`输出到终端时可能会报错，可以使用`$(info 文本或变量)`来输出
 
@@ -820,30 +820,507 @@ all:
 
 ***
 
-* `if` :
+* `if` : 判断目标是否不为空，不为空就返回这个目标，为空返回指定内容
 
-#### 指定文件
+```makefile
+files = main.c src/test.c src/hello.c include/hello.h
+# 三个参数，效果就是普通的判断语句
+result = $(if $(files),$(files),Not exists)
 
-当makefile文件内容中找不到指定的文件时，可以使用`-f`来指定依赖的文件
+all:
+	$(info $(result))
+```
+
+* `or` : 返回条件中第一个不为空的部分
+
+```makefile
+f1 =
+f2 =
+f3 = hello.o
+# 这里返回了第三个
+result = $(or $(f1),$(f2),$(f3))
+
+all:
+	$(info $(result))
+```
+
+* `and` : 只要有一个为空就返回空，都不为空就返回最后一个
+
+```makefile
+f1 = main.o
+f2 = test.o
+f3 = hello.o
+# 这里返回了最后一个
+result = $(and $(f1),$(f2),$(f3))
+
+all:
+	$(info $(result))
+```
+
+* `intcmp` : 比较两个整数的大小，返回对应操作结果（gcc4.4以上版本）
+
+```makefile
+# 比较第1个和第2个参数，小于就返回第3个参数，等于就返回第4个，大于就返回第5个
+result = $(intcmp 1,2,le,eq,gt)
+# 相等就返回1，不相等就返回空
+result1 = $(intcmp 1,2)
+all:
+	$(info $(result))
+	$(info $(result1))
+```
+
+## 📄文件函数
+
+***
+
+* `file` : 读写文件
+
+```makefile
+# 三个参数，第一个是操作符(>覆盖、>>追加、<读取)，第二个是文件名，第三个是写入的文本(如果是读取就不需要这个参数)
+# 执行成功返回greater提示
+text = This is write text
+result = $(file >>,test.txt,$(text))
+
+all:
+	$(info $(result))
+```
+
+## 🏂循环函数
+
+***
+
+* `foreach` : 对目标里每一项进行处理，并返回处理后的列表
+
+```makefile
+files = main.c src/test.c src/hello.c include/hello.h
+
+# 循环处理，将每一项的目录去掉并将.c替换为.o,将处理好的结果放到result
+# 三个参数，1 临时变量，2 目标列表，3 处理动作
+result = $(foreach each,$(files),$(patsubst %.c,%.o,$(notdir $(each))))
+
+all:
+	$(info $(result))
+```
+
+## 🏌️‍♂️自定义函数调用
+
+***
+
+* `call` : 可以用来调用自定义函数(复杂表达式)，也可以调用普通函数
+
+```makefile
+func = var1 $(1), var2 $(2), var3 $(3)
+
+# 参数不定长，第1个参数固定为自定义函数名(变量名)
+result = $(call func,a,b,c)
+
+all:
+	$(info $(result))
+```
+
+或者组合其他函数使用
+
+```makefile
+# 使用realpath获得绝对路径，然后使用dir获得目录(剔除了文件名)
+dirof = $(dir $(realpath $(1)))
+# 调用dirof，传入文件名
+result = $(call dirof,main.c)
+
+all:
+	$(info $(result))
+```
+
+## 🕺变量相关函数
+
+* `value` : 返回变量的定义，延迟展开变量如果未被展开就返回表达式本身，立即展开变量会直接返回值
+
+```makefile
+file = $(var)
+
+result = $(value file)
+
+var = main.c
+
+all:
+	$(info $(result))
+```
+
+* `origin` : 返回变量的定义来源，如果变量未被定义就返回undefined，make软件自身的变量就返回default，如果是系统环境变量就返回environment，当前makefile中定义的变量就返回file，自动变量就返回automatic
+
+```makefile
+file = main.c
+
+result = $(origin SHELL)
+
+all:
+	$(info $(result))
+```
+
+* `flavor` : 返回变量的赋值方式，变量未定义就返回undefined，如果不是立即展开变量就返回recursive，是立即展开变量就返回simple
+
+```makefile
+file = main.c
+
+result = $(flavor file)
+
+all:
+	$(info $(result))
+```
+
+## 🐡其他函数
+
+* `eval` : 将文本当成makefile语句执行
+
+```makefile
+# 定义一个多行变量
+define var =
+ext_run:
+	@echo Target ext test
+endef
+
+# 相当于把上面定义的变量内容插入到了这里，使用make命令执行时就会默认执行第一个目标，也就是ext_run目标，而all目标不会被执行到
+$(eval $(var))
+
+all:
+	$(info eval is run)
+```
+
+* `shell` : 执行shell命令，返回执行结果
+
+```makefile
+result = $(shell ls)
+
+all:
+	$(info $(result))
+```
+
+* `let` : 将目标列表内容逐个放入指定变量中，如果目标超过了自定义变量个数那么会将剩余的都放入最后一个变量中
+
+一般配合call函数可以实现一些比较灵活的操作
+
+```makefile
+files = main.c src/test.c src/hello.c include/hello.h
+
+# 前n个参数是自定义个数，后两个参数一个是源变量，一个是指定要返回的自定义变量
+result = $(let v1 v2 v3,$(files),v3)
+
+all:
+	$(info $(result))
+```
+
+## 🪴日志信息
+
+* `info` : 输出提示信息
+
+```makefile
+all:
+	$(info printf info)
+``
+
+* `warning` : 输出警告信息，并且附带当前行号
+
+```makefile
+all:
+	$(warning printf warning)
+```
+
+* `error` : 输出错误信息，并附带当前行号和停止make运行
+
+```makefile
+all:
+	$(error printf error)
+```
+
+<br>
+
+# 🦅自动推导与隐式规则
+
+* 自动推导 : 默认情况下只写目标和依赖，gcc会自动使用命令工具生成目标，如果目标是最终程序会自动链接
+
+```makefile
+files = main.c src/test.c src/hello.c include/hello.h
+
+main: $(files)
+
+clean:
+	-rm main *.o *.i *.s
+```
+
+> C代码默认链接时使用的是make变量里CC里的工具(命令工具:cc)，如果是需要用其他工具就需要手动覆盖一下CC变量
+
+* 隐式规则 : 在指定.o目标和依赖时，make默认使用CC进行编译，并且添加了常用的参数
+
+如果想破坏这种默认规则，需要如下操作
+
+```makefile
+# 这样写目标和依赖并且没有方法，就会破坏默认将.c编译成.o的默认规则
+%.o : %.c
+
+# 写上方法就可以手动指定规则
+%.o : %.c
+	$(CC) -c $<
+```
+
+C编译规则：`$(CC) $(CPPFLAGS) $(CFLAGS) -c`
+
+C++编译规则：`$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c`
+
+链接规则：`$(CC) $(LDFLAGS) *.o $(LOADLIBES) $(LDLIBS)`
+
+## 🦉常用make变量
+
+1.程序名变量 (Program Names)
+
+这些变量定义了在隐式规则中要使用的程序路径和名称。
+
+| 变量名 | 默认值 | 说明 |
+| :--- | :--- | :--- |
+| `CC` | `cc` | **C 编译器**。这是最常用的变量，通常在你的 Makefile 中会覆盖它，例如 `CC = gcc` 或 `CC = clang`。 |
+| `CXX` | `g++` | **C++ 编译器**。用于编译 `.cc`, `.cpp`, `.C` 等 C++ 源文件。 |
+| `CPP` | `$(CC) -E` | **C 预处理器**。 |
+| `AR` | `ar` | **静态库打包程序**。用于创建 `.a` 归档文件。 |
+| `AS` | `as` | **汇编器**。用于编译 `.s` 文件。 |
+| `LD` | `ld` | **链接器**。用于直接链接目标文件。 |
+| `FC`/`F77` | `f77` | **Fortran 编译器**。 |
+| `RM` | `rm -f` | **删除命令**。在清理规则（如 `clean`）中非常有用。 |
+| `MAKE` | `make` | make命令，在指定目录执行make, 或者在后面附带其他参数 |
+
+如何使用：
+
+你通常会在 Makefile 的开头覆盖这些变量，以指定你偏好的工具链。
+```makefile
+CC = gcc
+CXX = g++
+AR = ar
+```
+
+2.标志变量 (Flags)
+
+这些变量定义了传递给相应程序的命令行参数。
+
+| 变量名 | 说明 |
+| :--- | :--- |
+| `CFLAGS` | **传递给 C 编译器的标志**。例如优化等级 `-O2`、调试信息 `-g`、警告选项 `-Wall`。 |
+| `CXXFLAGS` | **传递给 C++ 编译器的标志**。用法同 `CFLAGS`。 |
+| `CPPFLAGS` | **传递给 C/C++ 预处理器的标志**。通常用于定义宏（`-DNAME`）和包含路径（`-Iinclude_dir`）。它同时用于编译（`*.c` -> `*.o`）和链接（`*.o` -> 可执行文件）阶段。 |
+| `LDFLAGS` | **传递给链接器的标志**（当编译器充当链接器驱动时）。例如 `-L` 指定库搜索路径。 |
+| `LDLIBS` | **传递给链接器的库标志**。通常放在命令末尾，指定要链接的库，例如 `-lm`（数学库）、`-lpthread`（线程库）。 |
+| `ARFLAGS` | **传递给 `ar` 程序的标志**。默认值是 `rv`（r: 替换成员，v: 显示详细操作）。 |
+
+如何使用：
+
+这些变量是你定制构建过程的核心。你可以根据需要添加各种编译和链接选项。
+```makefile
+CFLAGS = -O2 -g -Wall -pedantic
+CPPFLAGS = -I./include -DDEBUG
+LDFLAGS = -L./lib
+LDLIBS = -lmylib -lm
+```
+
+3.自动变量 (Automatic Variables)
+
+这些变量在规则的命令部分被自动定义，它们的值取决于规则的目标和依赖关系。它们不是“隐式规则变量”，但编写任何规则（无论是显式还是隐式）都极其重要。
+
+| 变量名 | 说明 |
+| :--- | :--- |
+| `$@` | **当前规则的目标文件名**。 |
+| `$<` | **第一个依赖文件的文件名**。 |
+| `$^` | **所有依赖文件的列表**，以空格分隔。 |
+| `$?` | **所有比目标更新的依赖文件列表**。 |
+| `$*` | **匹配隐式规则后缀模式的主干（stem）**。例如，如果目标是 `file.o`，依赖是 `file.c`，则 `$*` 的值就是 `file`。 |
+
+示例：
+
+假设你有一条规则：`app: main.o utils.o`
+```makefile
+app: main.o utils.o
+    $(CC) -o $@ $^ $(LDLIBS) # 等价于：gcc -o app main.o utils.o -lm
+```
+在这个命令中：
+`$@` 被展开为 `app`
+`$^` 被展开为 `main.o utils.o`
+
+4.参数控制变量 (Parameter Control)
+
+这些变量可以修改命令本身的行为。
+
+| 变量名 | 说明 |
+| :--- | :--- |
+| `MAKEFLAGS` | 传递给子 make 进程的标志。 |
+| `SHELL` | 指定 Make 执行命令时使用的 shell。默认是 `/bin/sh`。**注意：** 这个变量不会从环境中继承，你必须在 Makefile 中显式设置它。 |
+| `MAKECMDGOALS` | 用户在执行 make 时指定的目标列表。例如，`make clean all`，则 `$(MAKECMDGOALS)` 包含 `clean all`。可用于条件判断。 |
+
+### 一个综合示例
+
+让我们看一个完整的 Makefile，它利用了这些变量：
+
+```makefile
+# 覆盖程序名和标志变量
+CC = gcc
+CFLAGS = -O2 -g -Wall
+CPPFLAGS = -I./include
+LDFLAGS = -L./lib
+LDLIBS = -lm
+
+# 最终目标
+myapp: main.o utils.o helper.o
+    $(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
+
+# 为 helper.o 指定额外的编译标志
+helper.o: helper.c
+    $(CC) $(CFLAGS) $(CPPFLAGS) -DSPECIAL_OPTION -c -o $@ $<
+
+# 告诉 make ‘clean’ 不是一个文件，而是一个动作
+.PHONY: clean
+
+# 使用 RM 变量进行清理
+clean:
+    $(RM) myapp *.o
+```
+
+**在这个例子中：**
+
+1.  `myapp` 的链接规则使用了自动变量 `$@` (目标名) 和 `$^` (所有依赖)。
+2.  隐式规则被用于构建 `main.o` 和 `utils.o`。Make 会自动调用：
+    ```bash
+    gcc -O2 -g -Wall -I./include -c -o main.o main.c
+    gcc -O2 -g -Wall -I./include -c -o utils.o utils.c
+    ```
+3.  我们为 `helper.o` 写了一个**显式规则**，因为它需要一个特殊的编译选项 `-DSPECIAL_OPTION`。这个规则覆盖了隐式规则。
+4.  `clean` 目标使用了 `$(RM)` 变量，它默认展开为 `rm -f`。
+
+
+<br>
+
+# 🦦多Makefile
+
+* 包含 : 包含其他makefile文件到当前文件中
+
+```makefile
+objs := main.o test.o hello.o hello.h
+
+# 直接使用include关键字，会将后面指定的文件内容展开到当前位置
+# 如果里面定义了一个目标，执行make就会默认执行这个展开的目标，因为这里展开就成了第一个目标
+# 这里也可以指定多个makefile文件，如果文件不存在就会报错，如果要忽略错误就在include前面加个-符号
+# 还可以使用通配符来匹配其他makefile文件，makefile*
+include submk
+
+main: $(objs)
+	$(CXX) -o $@ $^
+clean:
+	-$(RM) main *.o
+```
+
+* 嵌套 : 通常在一些大型项目中会将业务拆分成多模块，每个模块单独有一个makefile文件，在项目根目录定义一个总makefile文件嵌套这些子模块
+
+文件结构
+```bash
+$ tree --dirsfirst
+.
+├── bin
+├── include
+│   ├── font.h
+│   ├── hello.h
+│   └── main.h
+├── lib
+│   ├── hello.c
+│   ├── font.c
+│   └── Makefile
+├── src
+│   ├── main.c
+│   └── Makefile
+└── Makefile
+```
+
+lib/Makefile
+```makefile
+cfile := $(wildcard *.c)
+
+objs := $(cfile:%.c=%.o)
+
+CFLAGS += -I../include -Wall -O2 -g
+
+libmain.a: $(objs)
+	$(AR) rcs $@ $^
+```
+
+src/Makefile
+```makefile
+vpath %.a ../lib
+
+CFLAGS += -I../include
+
+LDFLAGS += -L../lib
+
+LDLIBS += -lmain
+
+../bin/main: main.o libmain.a
+	$(CC) -o $@ $< $(LDFLAGS) $(LDLIBS)
+
+.PHONY: clean
+clean:
+	$(RM) *.o ../bin/*
+```
+
+./Makefile
+```makefile
+.PHONY: subsrc sublib
+
+# 方法：进入src目录执行make命令
+subsrc: sublib
+	$(MAKE) -C src
+
+# 同上
+sublib:
+	$(MAKE) -C lib
+
+# 进入指定目录执行make clean
+clean:
+	$(MAKE) clean -C src
+	$(MAKE) clean -C lib
+```
+
+* 传递变量 : 向子模块Makefile中传递指定变量
+
+```makefile
+# 传递var
+export var
+# 传递所有变量
+export
+# 取消传递
+unexport
+```
+
+<br>
+
+# 🦈GCC常见选项
+
+***
+
+* `-f` : 当makefile文件内容中找不到指定的文件时，可以使用`-f`来指定依赖的文件
 
 比如文件中写的是`hello.c`，但是真实文件的名称是`hello.123`
 
 执行命令: `make -f hello.123`
 
-<br/>
 
-#### 显示要执行的命令
+* 显示要执行的命令
 
 在执行`make`命令是想看看`makefile`中需要执行哪些指令
 
 可以使用`make -n `选项来查看指令，并不会真的执行里面的指令，常用于调试
 
-<br/>
 
-#### 指定目录
+* 指定目录
 
 当项目中包含有子模块的makefile时，可以使用`make -C`来指定子目录
 
 在makefile汇总根目录执行
 
 `make -C dir01`
+
+***
+
+> ⭐提示：后续进阶可以学Cmake或者Meson，自动化操作跟高
+
+内容来源: Bilibili(@无限十三年)

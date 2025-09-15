@@ -62,6 +62,36 @@ $ gcc -MM main.c
   + gcc检测文件是从右往左
   + 某个源文件需要依赖另一个源文件时需要把依赖放在前面(右边)
 
+
+### 字符编码指定
+
+在一些情况下源码文件用的utf-8编码，但是在程序运行环境中只支持gbk或其他编码显示否则乱码，这时就需要用到下列选项
+
+
+* `-finput-charset` : 告诉gcc源文件使用的字符编码
+
+
+* `-fexec-charset` : 此选项指定编译后的程序中字符串常量的编码
+
+
+示例：从 GBK 编码源文件编译为使用 UTF-8 编码的程序
+
+```bash
+gcc -finput-charset=GBK -fexec-charset=UTF-8 -o myprogram source.c
+```
+
+* `-fwide-exec-charset` : 这个选项指定宽字符字符串字面量在编译后的执行文件中使用的编码格式
+
+宽字符是C/C++中用于表示扩展字符集（如Unicode）的一种数据类型。与普通的char类型（通常为1字节）不同，宽字符使用wchar_t类型，其大小取决于平台（通常是2或4字节）
+
+```bash
+# 处理GBK编码的源文件，生成使用UTF-8窄字符和UTF-32宽字符的程序
+gcc -finput-charset=GBK \
+    -fexec-charset=UTF-8 \
+    -fwide-exec-charset=UTF-32 \
+    program.c -o program
+```
+
 <br>
 
 ## 🎉库文件
@@ -83,7 +113,7 @@ $ gcc -Wall main.c /usr/lib/libm.a -o calc
 
 > ⚠️注意: 指定库文件是，需要注意文件依赖顺序(右->左)
 
-2. 使用`-l`选项指定外部库文件
+2. 使用`-l`选项指定外部库文件，需要注意命令规则`lib程序名.a`
 
 ```bash
 $ gcc -Wall main.c -lm -o calc
