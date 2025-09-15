@@ -1321,6 +1321,6 @@ unexport
 
 ***
 
-> ⭐提示：后续进阶可以学Cmake或者Meson，自动化操作跟高
+> ⭐提示：后续进阶可以学Cmake或者Meson，自动化操作更高
 
 内容来源: Bilibili(@无限十三年)
