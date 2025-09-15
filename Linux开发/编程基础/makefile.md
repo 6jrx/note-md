@@ -1015,7 +1015,7 @@ all:
 ```makefile
 all:
 	$(info printf info)
-``
+```
 
 * `warning` : 输出警告信息，并且附带当前行号
 
