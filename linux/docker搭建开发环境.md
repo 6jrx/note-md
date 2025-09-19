@@ -1,4 +1,4 @@
-### 概述
+## 搭建Ubuntu 18.4容器
 
 在使用linux开发机中需要用到低版本的编译环境，比如gcc7.5，之前一直使用的ubuntu_18.4虚拟机作为开发机，所以这里直接docker来搭建环境，减少虚拟机开销。
 
@@ -162,3 +162,193 @@ docker run -it --name my-dev-env -v /path/to/your/code:/app ubuntu18-gcc7.5-env
 | **退出但保持容器运行** | 在容器内按 **Ctrl + P + Q** | 非常实用。 |
 
 **最重要的提醒**：确保你每次进入的都是**正确的容器**。特别是在同时运行多个容器时，仔细核对 `docker ps` 输出的容器名称或 ID。
+
+## 转发图形软件到主机
+
+### 步骤1：在宿主机上安装X11服务器
+
+确保Arch Linux主机已安装X11服务器：
+```bash
+sudo pacman -S xorg-xhost
+```
+
+### 步骤2：修改Docker容器运行命令
+
+使用以下命令运行您的Ubuntu 18.04容器，添加X11转发所需的参数：
+
+```bash
+docker run -it \
+  --name qt-dev-container \
+  -e DISPLAY=$DISPLAY \
+  -v /tmp/.X11-unix:/tmp/.X11-unix \
+  -v /dev/dri:/dev/dri \
+  -v /path/to/your/project:/home/project \
+  --device /dev/snd \
+  --privileged \
+  your-ubuntu-qt-image
+```
+
+参数说明：
+- `-e DISPLAY=$DISPLAY`：传递显示环境变量
+- `-v /tmp/.X11-unix:/tmp/.X11-unix`：共享X11套接字
+- `-v /dev/dri:/dev/dri`：允许使用硬件加速（可选）
+- `-v /path/to/your/project:/home/project`：映射项目目录
+- `--device /dev/snd`：允许音频（可选）
+
+### 步骤3：在容器内配置Qt Creator
+
+进入容器并配置Qt Creator：
+
+```bash
+# 进入容器
+docker exec -it qt-dev-container bash
+
+# 启动Qt Creator（在容器内）
+qtcreator
+```
+
+## 步骤4：创建便捷启动脚本
+
+在宿主机上创建一个启动脚本`start-qtcreator.sh`：
+
+```bash
+#!/bin/bash
+xhost +local:docker
+docker start qt-dev-container 2>/dev/null || docker run -it \
+  --name qt-dev-container \
+  -e DISPLAY=$DISPLAY \
+  -v /tmp/.X11-unix:/tmp/.X11-unix \
+  -v /dev/dri:/dev/dri \
+  -v $HOME/qt-projects:/home/project \
+  --device /dev/snd \
+  your-ubuntu-qt-image \
+  qtcreator
+```
+
+给脚本添加执行权限：
+```bash
+chmod +x start-qtcreator.sh
+```
+
+## 使用已存在的Docker容器运行Qt Creator
+
+是的，您完全可以使用已经运行过的容器来运行Qt Creator。以下是具体操作步骤：
+
+### 步骤1：确保容器已安装Qt Creator
+
+首先，进入您已存在的容器并安装Qt Creator（如果尚未安装）：
+
+```bash
+# 进入已存在的容器
+docker exec -it your-container-name bash
+
+# 在容器内安装Qt Creator和相关依赖
+apt-get update
+apt-get install qtcreator qt5-default -y
+```
+
+### 步骤2：配置X11转发
+
+对于已存在的容器，您需要确保X11转发已正确配置：
+
+1. 在宿主机上允许Docker连接X11服务器：
+   ```bash
+   xhost +local:docker
+   ```
+
+2. 检查容器是否已有X11相关配置：
+   ```bash
+   docker inspect your-container-name | grep -i x11
+   ```
+
+3. 如果容器没有X11配置，您需要重新创建容器（保留数据）：
+   ```bash
+   # 首先提交当前容器为镜像
+   docker commit your-container-name my-qt-image
+
+   # 然后停止并删除旧容器
+   docker stop your-container-name
+   docker rm your-container-name
+
+   # 使用新镜像创建容器，并添加X11配置
+   docker run -it \
+     --name your-container-name \
+     -e DISPLAY=$DISPLAY \
+     -v /tmp/.X11-unix:/tmp/.X11-unix \
+     -v /dev/dri:/dev/dri \
+     -v /path/to/your/project:/home/project \
+     my-qt-image
+   ```
+
+### 步骤3：在现有容器中启动Qt Creator
+
+如果您的容器已经运行且配置了X11转发，可以直接执行：
+
+```bash
+# 在运行的容器中启动Qt Creator
+docker exec -it your-container-name qtcreator
+```
+
+### 步骤4：创建便捷启动脚本
+
+为了让使用更方便，创建一个启动脚本：
+
+```bash
+#!/bin/bash
+# 启动Qt Creator容器脚本
+CONTAINER_NAME="your-container-name"
+
+# 检查容器是否正在运行
+if [ ! "$(docker ps -q -f name=$CONTAINER_NAME)" ]; then
+    # 容器未运行，启动它
+    if [ "$(docker ps -aq -f status=exited -f name=$CONTAINER_NAME)" ]; then
+        # 容器存在但已停止，启动它
+        docker start $CONTAINER_NAME
+    else
+        # 容器不存在，需要重新创建（使用之前保存的镜像）
+        docker run -it -d \
+          --name $CONTAINER_NAME \
+          -e DISPLAY=$DISPLAY \
+          -v /tmp/.X11-unix:/tmp/.X11-unix \
+          -v /dev/dri:/dev/dri \
+          -v /path/to/your/project:/home/project \
+          my-qt-image \
+          /bin/bash
+    fi
+    # 等待容器完全启动
+    sleep 2
+fi
+
+# 允许X11连接
+xhost +local:docker
+
+# 在容器中启动Qt Creator
+docker exec -it $CONTAINER_NAME qtcreator
+```
+
+### 步骤5：处理可能的权限问题
+
+如果遇到权限问题，可以尝试以下解决方案：
+
+1. 在容器内创建一个与宿主机用户相同UID的用户：
+   ```bash
+   # 在容器内执行
+   useradd -u $(id -u) -m dockeruser
+   ```
+
+2. 使用特定用户运行Qt Creator：
+   ```bash
+   docker exec -it --user $(id -u) your-container-name qtcreator
+   ```
+
+### 注意事项
+
+1. 确保宿主机和容器内的Qt版本兼容
+2. 如果使用硬件加速，确保正确挂载了GPU设备（如NVIDIA GPU需要额外配置）
+3. 考虑使用Docker volume来持久化Qt Creator的配置
+4. 如果遇到显示问题，尝试使用软件渲染：
+   ```bash
+   docker exec -it your-container-name qtcreator -software-gl
+   ```
+
+通过以上步骤，您可以在已存在的Docker容器中使用Qt Creator进行开发，同时保持原有的编译环境和项目文件。
