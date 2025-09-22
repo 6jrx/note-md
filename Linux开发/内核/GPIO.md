@@ -48,3 +48,7 @@ lrwxrwxrwx 1 root root    0 Jan  1 00:55 subsystem -> ../../../../../../../class
 ```bash
 $ cat /sys/kernel/debug/gpio
 ```
+
+
+## 待补充内容
+
