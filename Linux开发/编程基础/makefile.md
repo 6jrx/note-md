@@ -100,6 +100,7 @@ main.o: main.c | hello.c
 默认情况下，方法里的每条命令都是单独的子进程执行
 
 ```makefile
+# 这个声明通常放在 Makefile 的开头，影响之后的所有目标
 .ONESHELL:
 
 main.o: main.c
